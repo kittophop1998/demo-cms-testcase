@@ -19,6 +19,14 @@ func main() {
 	// Create notion handler with config
 	notionHandler := handlers.NewNotionHandler(cfg)
 
+	// Health check endpoint
+	r.GET("/api/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "healthy",
+			"service": "demo-notion-api",
+		})
+	})
+
 	// Routes
 	api := r.Group("/api")
 	{

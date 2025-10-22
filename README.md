@@ -16,8 +16,52 @@ A Go backend service using Gin framework that integrates with Notion API to mana
 - Go 1.19 or higher
 - Notion API key
 - Notion database with test cases
+- Docker (optional, for containerized deployment)
+- Docker Compose (optional, for easy multi-service management)
 
-## Installation
+## Installation & Running
+
+### Option 1: Using Docker (Recommended)
+
+#### For Production:
+```bash
+# Build and run with docker-compose
+make run
+
+# Or manually
+docker-compose up --build -d
+
+# View logs
+make logs
+
+# Stop services
+make stop
+```
+
+#### For Development (with hot reload):
+```bash
+# Run development server with volume mounting
+make dev
+
+# Stop development server
+make dev-down
+```
+
+#### Build Docker image only:
+```bash
+# Build production image
+make build
+
+# Check image size
+make image-size
+
+# Security scan (requires Trivy)
+make security-scan
+```
+
+### Option 2: Local Development
+
+#### Manual Setup:
 
 1. Clone the repository:
 ```bash
@@ -224,6 +268,64 @@ demo-notion-api/
 ├── go.mod              # Go module definition
 └── README.md           # Project documentation
 ```
+
+## Docker Information
+
+### Multi-Stage Build
+The Dockerfile uses multi-stage build with two stages:
+
+1. **Build Stage** (`builder`):
+   - Based on `golang:1.23-alpine`
+   - Downloads dependencies and compiles the Go application
+   - Creates a static binary for optimal performance
+
+2. **Runtime Stage** (`runtime`):
+   - Based on `alpine:latest` for minimal size
+   - Runs as non-root user for security
+   - Includes health checks
+   - Final image size: ~20MB (vs ~800MB with full Go image)
+
+### Available Commands
+```bash
+# Show all available commands
+make help
+
+# Development
+make dev          # Run with hot reload
+make dev-down     # Stop development server
+
+# Production
+make build        # Build Docker image
+make run          # Run production server
+make stop         # Stop production server
+make logs         # View logs
+
+# Maintenance
+make clean        # Clean up Docker resources
+make security-scan # Scan for vulnerabilities
+make image-size   # Show image size
+```
+
+### Environment Variables
+```bash
+PORT=8080           # Server port (default: 8080)
+GIN_MODE=release    # Gin mode (debug/release)
+NOTION_API_KEY=     # Your Notion API key
+NOTION_DATABASE_ID= # Your Notion database ID
+```
+
+### Health Check
+The application includes a health check endpoint:
+- **URL**: `GET /api/health`
+- **Response**: `{"status": "healthy", "service": "demo-notion-api"}`
+- **Docker Health Check**: Runs every 30 seconds
+
+### Security Features
+- Runs as non-root user (uid: 1001)
+- Minimal attack surface with Alpine Linux
+- Static binary compilation
+- CA certificates included for HTTPS requests
+- .dockerignore to exclude sensitive files
 
 ## Error Handling
 

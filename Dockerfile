@@ -1,43 +1,61 @@
-# ---------------------------------------------------------
-# Stage 1: Build Go binary
-# ---------------------------------------------------------
-FROM golang:1.25-alpine AS builder
+# =====================================
+# Build Stage - ใช้สำหรับ compile Go application
+# =====================================
+FROM golang:1.23-alpine AS builder
 
-# Set working directory
+# ติดตั้ง dependencies ที่จำเป็นสำหรับ build
+RUN apk add --no-cache git ca-certificates
+
+# สร้าง working directory
 WORKDIR /app
 
-# Copy go.mod/go.sum and download dependencies
+# Copy go mod และ go sum files เพื่อ download dependencies
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
 
-# Copy the entire project
+# Download dependencies
+RUN go mod download
+
+# Copy source code ทั้งหมด
 COPY . .
 
-# Move to working dir for main.go
-WORKDIR /app/cmd/server
+# Build the Go app สำหรับ Linux
+# CGO_ENABLED=0 เพื่อสร้าง static binary
+# GOOS=linux เพื่อให้แน่ใจว่า build สำหรับ Linux
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
-# Build Go binary
-RUN go build -o server .
+# =====================================
+# Runtime Stage - ใช้สำหรับ run application
+# =====================================
+FROM alpine:latest AS runtime
 
-# ---------------------------------------------------------
-# Stage 2: Run with Google Chrome
-# ---------------------------------------------------------
-FROM debian:stable-slim
+# ติดตั้ง ca-certificates สำหรับ HTTPS requests
+RUN apk --no-cache add ca-certificates
 
-# Install certificates (for HTTPS support)
-# RUN apk --no-cache add ca-certificates
+# สร้าง user ที่ไม่ใช่ root เพื่อความปลอดภัย
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
-# Set working directory
+# สร้าง working directory
 WORKDIR /root/
 
-# Copy binary from builder
-COPY --from=builder /app/cmd/server/server .
+# Copy binary จาก build stage
+COPY --from=builder /app/main .
 
-# (Optional) Copy configs if needed
-COPY configs/ /root/configs/
+# Copy ca-certificates จาก build stage ถ้าจำเป็น
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Expose port (เปลี่ยนตามที่ Go app ใช้)
+# เปลี่ยน ownership ของไฟล์ให้กับ appuser
+RUN chown -R appuser:appgroup /root/
+
+# เปลี่ยนไปใช้ non-root user
+USER appuser
+
+# Expose port (ปรับตามที่ใช้ใน application)
 EXPOSE 8080
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+
 # Run the binary
-CMD ["./server"]
+CMD ["./main"]
