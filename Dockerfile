@@ -1,7 +1,7 @@
 # =====================================
 # Build Stage - ใช้สำหรับ compile Go application
 # =====================================
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # ติดตั้ง dependencies ที่จำเป็นสำหรับ build
 RUN apk add --no-cache git ca-certificates
