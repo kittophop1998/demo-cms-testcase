@@ -146,6 +146,32 @@ func (h *NotionHandler) GetBlockDetails(c *gin.Context) {
 	})
 }
 
+// GetDetailedTestCases godoc
+// @Summary Get detailed test cases with table data
+// @Description Search for test cases and include all table data in one response
+// @Tags testcases
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.DetailedTestCaseResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/test-cases/detailed [get]
+func (h *NotionHandler) GetDetailedTestCases(c *gin.Context) {
+	detailedTestCases, err := h.notionService.GetDetailedTestCases()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to get detailed test cases",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data:    detailedTestCases,
+		Message: "Detailed test cases retrieved successfully",
+	})
+}
+
 // Response structures for API
 type APIResponse struct {
 	Success bool        `json:"success"`

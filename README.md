@@ -6,9 +6,10 @@ A Go backend service using Gin framework that integrates with Notion API to mana
 
 - 🔍 Search for test cases with TC_ prefix from Notion database
 - 📄 Retrieve page blocks from specific test cases  
-- 📊 Filter and retrieve table blocks
+- 📊 Filter and retrieve table blocks with full row data
 - 🎯 Extract test case information (status, dates, etc.)
 - 🚀 RESTful API endpoints
+- ⚡ Get detailed test cases with table data in a single API call (NEW!)
 
 ## Prerequisites
 
@@ -72,7 +73,20 @@ GET /api/test-cases
 
 Returns all test cases that start with `TC_` prefix from your Notion database.
 
-**Response:**
+#### 2. Get Detailed Test Cases with Table Data (NEW!)
+```bash
+GET /api/test-cases/detailed
+```
+
+**This is the main endpoint you requested!** It returns comprehensive test case information including all table data in a single API call.
+
+**Features:**
+- Searches for test cases using "External tasks" query
+- For each test case found, retrieves all table blocks
+- Extracts table row data including cell contents
+- Returns everything in a single response
+
+**Example Response:**
 ```json
 {
   "success": true,
@@ -83,15 +97,31 @@ Returns all test cases that start with `TC_` prefix from your Notion database.
       "title": "TC_01001 Login to CMS system by user role in case successfully.",
       "status": "Not started",
       "test_date": "2025-10-22",
-      "url": "https://www.notion.so/...",
-      "last_edited": "2025-10-22T04:40:00.000Z"
+      "url": "https://www.notion.so/TC_01001-Login-to-CMS-system-by-user-role-in-case-successfully-2946097f99e0805785caf10c7b8d4e68",
+      "last_edited": "2025-10-22T04:40:00.000Z",
+      "tables": [
+        {
+          "block_id": "2946097f-99e0-8040-9ed3-c80d828bae02",
+          "table_width": 6,
+          "has_column_header": true,
+          "has_row_header": false,
+          "rows": [
+            {
+              "cells": ["Step", "Action", "Expected Result", "Actual Result", "Status", "Screenshot"]
+            },
+            {
+              "cells": ["1", "Navigate to login page", "Login page is displayed", "", "", ""]
+            }
+          ]
+        }
+      ]
     }
   ],
-  "message": "Test cases retrieved successfully"
+  "message": "Detailed test cases retrieved successfully"
 }
 ```
 
-#### 2. Get Test Case Blocks
+#### 3. Get Test Case Blocks
 ```bash
 GET /api/test-cases/{testCaseKey}/blocks
 ```

@@ -23,6 +23,7 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.GET("/test-cases", notionHandler.SearchTestCases)
+		api.GET("/test-cases/detailed", notionHandler.GetDetailedTestCases)
 		api.GET("/test-cases/:testCaseKey/blocks", notionHandler.GetTestCaseBlocks)
 		api.GET("/blocks/:blockId", notionHandler.GetBlockDetails)
 	}

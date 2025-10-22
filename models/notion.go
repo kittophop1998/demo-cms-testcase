@@ -108,6 +108,7 @@ type NotionBlock struct {
 	InTrash        bool              `json:"in_trash"`
 	Type           string            `json:"type"`
 	Table          *NotionTable      `json:"table,omitempty"`
+	TableRow       *NotionTableRow   `json:"table_row,omitempty"`
 	Paragraph      *NotionParagraph  `json:"paragraph,omitempty"`
 	Heading2       *NotionHeading    `json:"heading_2,omitempty"`
 }
@@ -160,7 +161,38 @@ type BlockResponse struct {
 }
 
 type TableInfo struct {
-	TableWidth      int  `json:"table_width"`
-	HasColumnHeader bool `json:"has_column_header"`
-	HasRowHeader    bool `json:"has_row_header"`
+	TableWidth      int        `json:"table_width"`
+	HasColumnHeader bool       `json:"has_column_header"`
+	HasRowHeader    bool       `json:"has_row_header"`
+	Rows            []TableRow `json:"rows,omitempty"`
+}
+
+// TableRow represents a row in a table
+type TableRow struct {
+	Cells []string `json:"cells"`
+}
+
+// Detailed test case response with table data
+type DetailedTestCaseResponse struct {
+	TestCaseKey string          `json:"test_case_key"`
+	PageID      string          `json:"page_id"`
+	Title       string          `json:"title"`
+	Status      string          `json:"status"`
+	TestDate    string          `json:"test_date"`
+	URL         string          `json:"url"`
+	LastEdited  time.Time       `json:"last_edited"`
+	Tables      []TableWithData `json:"tables,omitempty"`
+}
+
+type TableWithData struct {
+	BlockID         string     `json:"block_id"`
+	TableWidth      int        `json:"table_width"`
+	HasColumnHeader bool       `json:"has_column_header"`
+	HasRowHeader    bool       `json:"has_row_header"`
+	Rows            []TableRow `json:"rows"`
+}
+
+// Table row block structure from Notion API
+type NotionTableRow struct {
+	Cells [][]RichText `json:"cells"`
 }

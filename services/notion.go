@@ -27,9 +27,8 @@ func NewNotionService(cfg *config.Config) *NotionService {
 // SearchTestCases searches for pages with "External tasks" query and extracts test cases
 func (s *NotionService) SearchTestCases() ([]models.TestCaseResponse, error) {
 	searchReq := models.NotionSearchRequest{
-		Query: "External tasks",
 		Filter: models.NotionSearchFilter{
-			Value:    "data_source",
+			Value:    "page",
 			Property: "object",
 		},
 		Sort: models.NotionSearchSort{
@@ -66,6 +65,7 @@ func (s *NotionService) SearchTestCases() ([]models.TestCaseResponse, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	fmt.Println("searchResp.Results", searchResp.Results)
 	return s.extractTestCases(searchResp.Results), nil
 }
 
@@ -162,6 +162,113 @@ func (s *NotionService) GetTableBlocks(pageID string) ([]models.BlockResponse, e
 	return tableBlocks, nil
 }
 
+// GetDetailedTestCases searches for test cases and includes their table data
+func (s *NotionService) GetDetailedTestCases() ([]models.DetailedTestCaseResponse, error) {
+	// First get all test cases
+	testCases, err := s.SearchTestCases()
+	if err != nil {
+		return nil, fmt.Errorf("failed to search test cases: %w", err)
+	}
+
+	var detailedTestCases []models.DetailedTestCaseResponse
+
+	for _, tc := range testCases {
+		detailed := models.DetailedTestCaseResponse{
+			TestCaseKey: tc.TestCaseKey,
+			PageID:      tc.PageID,
+			Title:       tc.Title,
+			Status:      tc.Status,
+			TestDate:    tc.TestDate,
+			URL:         tc.URL,
+			LastEdited:  tc.LastEdited,
+		}
+
+		// Get table blocks for this test case
+		tableBlocks, err := s.GetTableBlocks(tc.PageID)
+		if err != nil {
+			// Log error but continue with other test cases
+			fmt.Printf("Warning: failed to get table blocks for test case %s: %v\n", tc.TestCaseKey, err)
+			detailed.Tables = []models.TableWithData{}
+		} else {
+			// Get table data for each table block
+			for _, tableBlock := range tableBlocks {
+				tableData, err := s.GetTableData(tableBlock.BlockID)
+				if err != nil {
+					fmt.Printf("Warning: failed to get table data for block %s: %v\n", tableBlock.BlockID, err)
+					continue
+				}
+				detailed.Tables = append(detailed.Tables, *tableData)
+			}
+		}
+
+		detailedTestCases = append(detailedTestCases, detailed)
+	}
+
+	return detailedTestCases, nil
+}
+
+// GetTableData retrieves table data including all rows
+func (s *NotionService) GetTableData(tableBlockID string) (*models.TableWithData, error) {
+	// First get the table block info
+	tableBlock, err := s.GetBlockDetails(tableBlockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table block details: %w", err)
+	}
+
+	if tableBlock.Type != "table" || tableBlock.TableInfo == nil {
+		return nil, fmt.Errorf("block %s is not a table", tableBlockID)
+	}
+
+	// Get table rows (children of the table block)
+	url := fmt.Sprintf("%s/blocks/%s/children", s.config.NotionAPIURL, tableBlockID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	s.setHeaders(req)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("notion API error: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var blocksResp models.NotionBlocksResponse
+	if err := json.NewDecoder(resp.Body).Decode(&blocksResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Convert table rows
+	var rows []models.TableRow
+	for _, block := range blocksResp.Results {
+		if block.Type == "table_row" && block.TableRow != nil {
+			var cells []string
+			for _, cellArray := range block.TableRow.Cells {
+				cellContent := s.extractRichTextContent(cellArray)
+				cells = append(cells, cellContent)
+			}
+			rows = append(rows, models.TableRow{Cells: cells})
+		}
+	}
+
+	tableData := &models.TableWithData{
+		BlockID:         tableBlockID,
+		TableWidth:      tableBlock.TableInfo.TableWidth,
+		HasColumnHeader: tableBlock.TableInfo.HasColumnHeader,
+		HasRowHeader:    tableBlock.TableInfo.HasRowHeader,
+		Rows:            rows,
+	}
+
+	return tableData, nil
+}
+
 // Helper methods
 
 func (s *NotionService) setHeaders(req *http.Request) {
@@ -175,6 +282,7 @@ func (s *NotionService) extractTestCases(pages []models.NotionPage) []models.Tes
 
 	// Regex to match TC_ followed by numbers
 	tcRegex := regexp.MustCompile(`TC_(\d+)`)
+	fmt.Println("pages", pages)
 
 	for _, page := range pages {
 		// Extract Test Case Name property
@@ -209,6 +317,8 @@ func (s *NotionService) extractTestCases(pages []models.NotionPage) []models.Tes
 			}
 		}
 	}
+
+	fmt.Printf("Extracted %d test cases\n", len(testCases))
 
 	return testCases
 }
